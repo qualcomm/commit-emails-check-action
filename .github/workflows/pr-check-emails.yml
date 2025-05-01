@@ -1,0 +1,14 @@
+name: PR email addresses checker
+
+on:
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  pr-check-emails:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Check PR emails
+        uses: ./

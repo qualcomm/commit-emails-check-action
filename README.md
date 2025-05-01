@@ -12,7 +12,18 @@ addresses are appropriate for the repo.
 ## Example Usage
 
 ```yaml
-uses: qualcomm/commit-emails-check-action@main
+name: PR email addresses checker
+
+on:
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  pr-check-emails:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR emails
+        uses: qualcomm/commit-emails-check-action@main
 ```
 
 ## Copyright and License
