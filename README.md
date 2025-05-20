@@ -28,6 +28,31 @@ jobs:
         uses: qualcomm/commit-emails-check-action@main
 ```
 
+## Email address policy
+
+- Committer (in all cases) or Author (when commit is not an upstream cherry-pick)
+  - Block `@.*qualcomm.com` except `@qti.qualcomm.com` and `@oss.qualcomm.com`
+  - Block `<username>@quicinc.com`
+  - Block `quic_<username>@quicinc.com` (starting Jan 2026)
+  - Block `@codeaurora.org`
+- Author (when commit is an [upstream cherry-pick](#upstream-cherry_pick))
+  - Block `@.*qualcomm.com` except `@qti.qualcomm.com` and `@oss.qualcomm.com`
+  - Allow `<username>@quicinc.com`
+  - Allow `quic_<username>@quicinc.com` if author date is before Jan 1 2026
+  - Allow `@codeaurora.org` if author date is before Dec 4 2021
+
+The action also includes a check for email address characters in the commit identity "name".
+Malformed committer names are errors and malformed author names are warnings.
+
+### Upstream cherry-pick
+
+A commit is classified as an upstream cherry-pick if the commit message
+contains any of the following:
+
+- the footers `Git-Repo:` and `Git-Commit:`
+- the footer `Patch-mainline:`
+- the text `cherry picked from commit <commit-id>`
+
 ## Copyright and License
 
 ```text
