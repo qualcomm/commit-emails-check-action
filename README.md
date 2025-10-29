@@ -32,7 +32,9 @@ jobs:
 
 - Committer (in all cases) or Author (when commit is not an upstream cherry-pick)
   - Block `@.*qualcomm.com` except `@qti.qualcomm.com` and `@oss.qualcomm.com`
-  - Block `<username>@quicinc.com`
+  - Block `<username>@quicinc.com` unless the custom repository property
+    `allow-quicinc-authors` (for authors) or `allow-quicinc-committers` (for committers)
+    is set to true
   - Block `quic_<username>@quicinc.com` (starting Jan 2026)
   - Block `@codeaurora.org`
 - Author (when commit is an [upstream cherry-pick](#upstream-cherry_pick))

@@ -1,0 +1,6 @@
+[
+  {
+    "property_name": "Require-commit-email-check",
+    "value": "true"
+  }
+]

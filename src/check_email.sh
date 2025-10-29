@@ -57,6 +57,17 @@ is_committer_date_after() { # cutoff_date
     [ "$(convert_to_epoch_sec_if_needed "$COMMITTER_DATE")" -gt "$cutoff_date" ]
 }
 
+is_quicinc_allowed() { # role
+    local property
+    case "$1" in
+        Committer) property="allow-quicinc-committers" ;;
+        Author) property="allow-quicinc-authors" ;;
+        *) return 2 ;; # Not a valid role, programming error
+    esac
+    echo "$CUSTOM_PROPERTIES_JSON" | jq -e --arg property "$property" \
+        'any(.[]; .property_name == $property and .value == "true")' > /dev/null
+}
+
 convert_to_epoch_sec_if_needed() { # date-string (possibly already epoch_seconds)
     local first_git_commit=1112911993
     if [ "$1" -gt "$first_git_commit" ] 2> /dev/null ; then
@@ -90,26 +101,28 @@ isOssValid() { # email_address role
     local addr=$1 role=$2 ; shift 2
     case "$role" in
         Committer)
-            isOssValidCommitter "$addr"
+            isOssValidEmailAddr "$addr" "$role"
             return ;;
         Author)
-            isOssValidCommitter "$addr" || \
+            isOssValidEmailAddr "$addr" "$role" || \
                 (is_upstream_commit "$COMMIT" && isValidUpstreamAuthor "$addr")
             return ;;
         *) return 2 ;; # Not a valid role, programming error
     esac
 }
 
-isOssValidCommitter() { # email_address
+isOssValidEmailAddr() { # email_address role
     local addr=$1 ; shift 1
+    local role=$1 ; shift 1
     # Block @.*qualcomm.com
     if is_any_qualcomm_com "$addr" ; then
         # except @qti.qualcomm.com and @oss.qualcomm.com
         is_qti "$addr" || is_oss "$addr"
         return
     fi
-    # Block <username>@quicinc.com
-    if is_quicinc "$addr" && ! is_quic_username "$addr" ; then
+    # Block <username>@quicinc.com unless the corresponding custom repo properties
+    # are set to true
+    if is_quicinc "$addr" && ! is_quic_username "$addr" && ! is_quicinc_allowed "$role" ; then
         return 1
     fi
     # Block quic_<username>@quicinc.com (starting Jan 1 2026)
@@ -144,7 +157,8 @@ usage() { # error_message [error_code]
     local prog=$(basename -- "$0")
     cat <<EOF
 
-    usage: $prog --commit-json <json_string> [--verbose]
+    usage: $prog --commit-json <json_string> \
+        [--custom-properties-json <json_string>] [--verbose]
 
     The input provided to --commit-json should contain this structure (additional
     properties will be ignored):
@@ -168,6 +182,23 @@ usage() { # error_message [error_code]
 
   The "date" values should be either epoch seconds or a format like ISO 8061
   parseable by the \`date\` command.
+
+    The input provided to --custom-properties-json should contain this structure:
+[
+  {
+    "property_name": "Require-commit-email-check",
+    "value": "true"
+  },
+  {
+    "property_name": "allow-quicinc-authors",
+    "value": "true"
+  },
+  {
+    "property_name": "allow-quicinc-committers",
+    "value": "true"
+  }
+]
+
 EOF
 
     [ $# -gt 0 ] && error "$@"
@@ -177,10 +208,12 @@ EOF
 
 HAS_ERRORS=0
 VERBOSE=false
+CUSTOM_PROPERTIES_JSON="[]"
 while [ $# -gt 0 ] ; do
     case "$1" in
         --test-function) shift ; "$@" ; exit ;;
         --commit-json) shift ; COMMIT_JSON=$1 ;;
+        --custom-properties-json) shift ; CUSTOM_PROPERTIES_JSON=$1 ;;
         --verbose) VERBOSE=true ;;
         *) usage ;;
     esac
