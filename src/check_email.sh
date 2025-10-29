@@ -10,14 +10,14 @@ debug() { [ "$VERBOSE" = "true" ] && echo "::debug::$1" >&2 ; } # message
 error() { echo "::error::$1" >&2 ; HAS_ERRORS=1 ; } # message
 warning() { echo "::warning::$1" >&2 ; } # message
 
-json_val_by_key() { # key > value
-    echo "$JSON" | jq -r "$1 // empty"
+json_val_by_key() { # json key > value
+    echo "$1" | jq -r "$2 // empty"
 }
 
 has_email_characters() { echo "$1" | grep -q "[@<>]" ; } # name
 
 in_allowlist() { # email
-    echo "$JSON" | jq -e --arg email "$1" \
+    echo "$COMMIT_JSON" | jq -e --arg email "$1" \
         '.extra_allowed_emails? | contains([$email])' > /dev/null
 }
 
@@ -33,7 +33,7 @@ is_current_or_past_qc_email() { # email_address
 }
 
 is_upstream_commit() {
-    local commit_msg=$(json_val_by_key ".commit.message")
+    local commit_msg=$(json_val_by_key "$COMMIT_JSON" ".commit.message")
     contains_upstream_commit_footers "$commit_msg" || \
         contains_cherry_picked_from_text "$commit_msg"
 }
@@ -144,9 +144,9 @@ usage() { # error_message [error_code]
     local prog=$(basename -- "$0")
     cat <<EOF
 
-    usage: $prog --json <json_string> [--verbose]
+    usage: $prog --commit-json <json_string> [--verbose]
 
-    The input provided to --json should contain this structure (additional
+    The input provided to --commit-json should contain this structure (additional
     properties will be ignored):
 {
   "commit": {
@@ -180,7 +180,7 @@ VERBOSE=false
 while [ $# -gt 0 ] ; do
     case "$1" in
         --test-function) shift ; "$@" ; exit ;;
-        --json) shift ; JSON=$1 ;;
+        --commit-json) shift ; COMMIT_JSON=$1 ;;
         --verbose) VERBOSE=true ;;
         *) usage ;;
     esac
@@ -188,21 +188,21 @@ while [ $# -gt 0 ] ; do
 done
 
 # Proprietary or Open Source
-if ! REPO_EMAIL_TYPE=$(json_val_by_key ".license_type") || \
+if ! REPO_EMAIL_TYPE=$(json_val_by_key "$COMMIT_JSON" ".license_type") || \
         [ -z "$REPO_EMAIL_TYPE" ] ; then
     error "Cannot determine project license type. Must provide 'license_type' \
         as either 'PROPRIETARY' or 'OPEN_SOURCE'."
     exit
 fi
 
-COMMITTER_DATE=$(json_val_by_key ".commit.committer.date")
-COMMITTER_EMAIL=$(json_val_by_key ".commit.committer.email")
-COMMITTER_NAME=$(json_val_by_key ".commit.committer.name")
+COMMITTER_DATE=$(json_val_by_key "$COMMIT_JSON" ".commit.committer.date")
+COMMITTER_EMAIL=$(json_val_by_key "$COMMIT_JSON" ".commit.committer.email")
+COMMITTER_NAME=$(json_val_by_key "$COMMIT_JSON" ".commit.committer.name")
 debug "Committer is: $COMMITTER_NAME <$COMMITTER_EMAIL> , date: $COMMITTER_DATE"
 
-AUTHOR_DATE=$(json_val_by_key ".commit.author.date")
-AUTHOR_EMAIL=$(json_val_by_key ".commit.author.email")
-AUTHOR_NAME=$(json_val_by_key ".commit.author.name")
+AUTHOR_DATE=$(json_val_by_key "$COMMIT_JSON" ".commit.author.date")
+AUTHOR_EMAIL=$(json_val_by_key "$COMMIT_JSON" ".commit.author.email")
+AUTHOR_NAME=$(json_val_by_key "$COMMIT_JSON" ".commit.author.name")
 debug "Author is: $AUTHOR_NAME <$AUTHOR_EMAIL> , date: $AUTHOR_DATE"
 
 # Check for malformed names

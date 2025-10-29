@@ -58,7 +58,8 @@ done
 RESULT=0
 while read -r pr_commit ; do
     debug "Running check on: $pr_commit"
-    "$MYDIR"/src/check_email.sh --json "$pr_commit" "${TEST_MODE[@]}" || RESULT=1
+    "$MYDIR"/src/check_email.sh \
+        --commit-json "$pr_commit" "${TEST_MODE[@]}" || RESULT=1
 done < <(get_pr_commits | split_commits_and_add_metadata)
 
 exit $RESULT
