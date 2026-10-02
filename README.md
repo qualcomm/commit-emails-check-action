@@ -7,7 +7,10 @@ Qualcomm PR email addresses checker
 For each commit in a PR, validates that the commit's author and committer email
 addresses are appropriate for the repo.
 
-**NOTE:** This action should be used with `pull_request` events.
+**NOTE:** This action should be used with `pull_request` or
+`pull_request_target` events. It exits successfully without checking anything
+for other event types during normal execution. The `--test` option intentionally
+uses fixture data regardless of the event type.
 
 ## Example Usage
 

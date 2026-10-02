@@ -47,6 +47,14 @@ EOF
     exit 10
 }
 
+is_pr_event() {
+    case "${GITHUB_EVENT_NAME:-}" in
+        pull_request|pull_request_target) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+TEST_MODE=()
 while [ $# -gt 0 ] ; do
     case "$1" in
         --test) shift ; TEST_MODE=("--verbose") ;;
@@ -54,6 +62,11 @@ while [ $# -gt 0 ] ; do
     esac
     shift
 done
+
+if [ "${#TEST_MODE[@]}" -eq 0 ] && ! is_pr_event ; then
+    debug "Skipping email check for non-PR event: ${GITHUB_EVENT_NAME:-unknown}"
+    exit 0
+fi
 
 RESULT=0
 while read -r pr_commit ; do
