@@ -1,0 +1,31 @@
+{
+  "workflow_run": {
+    "event": "pull_request",
+    "pull_requests": [
+      {
+        "number": 101,
+        "url": "https://api.github.com/repos/example/example/pulls/101",
+        "head": {
+          "ref": "feature-one",
+          "sha": "1111111111111111111111111111111111111111"
+        },
+        "base": {
+          "ref": "main",
+          "sha": "2222222222222222222222222222222222222222"
+        }
+      },
+      {
+        "number": 202,
+        "url": "https://api.github.com/repos/example/example/pulls/202",
+        "head": {
+          "ref": "feature-two",
+          "sha": "3333333333333333333333333333333333333333"
+        },
+        "base": {
+          "ref": "main",
+          "sha": "4444444444444444444444444444444444444444"
+        }
+      }
+    ]
+  }
+}

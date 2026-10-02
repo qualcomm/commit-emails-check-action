@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+endpoint=${@: -1}
+
+case "$endpoint" in
+    */pulls/101|*/pulls/202)
+        echo '{"commits": 2}'
+        ;;
+    */pulls/101/commits\?per_page=2|*/pulls/202/commits\?per_page=2)
+        cat "$(cd -- "$(dirname -- "$0")/../.." && pwd)/pr_list_commits.json"
+        ;;
+    *)
+        echo "Unexpected endpoint: $endpoint" >&2
+        exit 1
+        ;;
+esac
