@@ -1,0 +1,6 @@
+{
+  "workflow_run": {
+    "event": "pull_request",
+    "pull_requests": []
+  }
+}

@@ -9,6 +9,32 @@ MYDIR=$(dirname -- "$MYPROG")
 debug() { echo "::debug::$1" >&2 ; } # message
 error() { echo "::error::$1" >&2 ; } # message
 
+# Make an authenticated request to the GitHub REST API.
+github_api_get() {
+    local endpoint=$1
+    debug "Getting data from $endpoint"
+    local debug_opts=()
+    [ -n "$RUNNER_DEBUG" ] && debug_opts=("--verbose" "--progress-meter" "--show-error")
+    curl -L --no-progress-meter --fail-with-body \
+        "${debug_opts[@]}" \
+        -H "Accept: application/vnd.github+json" \
+        -H "Authorization: Bearer $GITHUB_TOKEN" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        "$endpoint"
+}
+
+# https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#get-a-pull-request
+get_pr_metadata() {
+    local endpoint="$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/pulls/$PULL_NUMBER"
+    local metadata
+    metadata=$(github_api_get "$endpoint") || return 1
+    COMMITS_COUNT=$(jq -r '.commits // empty' <<< "$metadata")
+    if [ -z "$COMMITS_COUNT" ] ; then
+        error "Cannot determine commit count for pull request $PULL_NUMBER"
+        return 1
+    fi
+}
+
 # https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#list-commits-on-a-pull-request
 get_pr_commits() {
     if [ -n "$TEST_MODE" ] ; then
@@ -20,15 +46,7 @@ get_pr_commits() {
     # TODO: Handle paginated results
     # https://docs.github.com/en/rest/using-the-rest-api/using-pagination-in-the-rest-api?apiVersion=2022-11-28#using-link-headers
     local endpoint="$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/pulls/$PULL_NUMBER/commits?per_page=$COMMITS_COUNT"
-    debug "Getting commits from $endpoint"
-    local debug_opts=()
-    [ -n "$RUNNER_DEBUG" ] && debug_opts=("--verbose" "--progress-meter" "--show-error")
-    curl -L --no-progress-meter --fail-with-body \
-        "${debug_opts[@]}" \
-        -H "Accept: application/vnd.github+json" \
-        -H "Authorization: Bearer $GITHUB_TOKEN" \
-        -H "X-GitHub-Api-Version: 2022-11-28" \
-        "$endpoint"
+    github_api_get "$endpoint"
 }
 
 # https://docs.github.com/en/rest/repos/custom-properties?apiVersion=2022-11-28#get-all-custom-property-values-for-a-repository
@@ -69,8 +87,34 @@ EOF
 is_pr_event() {
     case "${GITHUB_EVENT_NAME:-}" in
         pull_request|pull_request_target) return 0 ;;
+        workflow_run)
+            case "${WORKFLOW_RUN_EVENT:-}" in
+                pull_request|pull_request_target) return 0 ;;
+            esac
+            return 1
+            ;;
         *) return 1 ;;
     esac
+}
+
+get_pr_numbers() {
+    if [ "${GITHUB_EVENT_NAME:-}" = "workflow_run" ] ; then
+        jq -r '.workflow_run.pull_requests[]?.number // empty' "$GITHUB_EVENT_PATH"
+    else
+        echo "$PULL_NUMBER"
+    fi
+}
+
+check_pr_commits() {
+    local result=0
+    while read -r pr_commit ; do
+        debug "Running check on: $pr_commit"
+        "$MYDIR"/src/check_email.sh \
+            --commit-json "$pr_commit" \
+            --custom-properties-json "$custom_properties" \
+            "${TEST_MODE[@]}" || result=1
+    done < <(get_pr_commits | split_commits_and_add_metadata)
+    return "$result"
 }
 
 TEST_MODE=()
@@ -87,14 +131,39 @@ if [ "${#TEST_MODE[@]}" -eq 0 ] && ! is_pr_event ; then
     exit 0
 fi
 
+if [ "${#TEST_MODE[@]}" -gt 0 ] ; then
+    custom_properties=$(get_custom_properties)
+    check_pr_commits
+    exit $?
+fi
+
+if [ "${GITHUB_EVENT_NAME:-}" = "workflow_run" ] && \
+        { [ -z "${GITHUB_EVENT_PATH:-}" ] || [ ! -r "$GITHUB_EVENT_PATH" ]; } ; then
+    error "Cannot read workflow_run event payload"
+    exit 1
+fi
+
+PR_NUMBERS=$(get_pr_numbers) || {
+    error "Cannot determine pull requests from workflow_run event payload"
+    exit 1
+}
+
+if [ -z "$PR_NUMBERS" ] ; then
+    debug "Skipping email check: workflow_run has no associated pull requests"
+    exit 0
+fi
+
 RESULT=0
 custom_properties=$(get_custom_properties)
-while read -r pr_commit ; do
-    debug "Running check on: $pr_commit"
-    "$MYDIR"/src/check_email.sh \
-        --commit-json "$pr_commit" \
-        --custom-properties-json "$custom_properties" \
-        "${TEST_MODE[@]}" || RESULT=1
-done < <(get_pr_commits | split_commits_and_add_metadata)
+while read -r PULL_NUMBER ; do
+    [ -n "$PULL_NUMBER" ] || continue
+    if [ "${GITHUB_EVENT_NAME:-}" = "workflow_run" ] ; then
+        get_pr_metadata || {
+            RESULT=1
+            continue
+        }
+    fi
+    check_pr_commits || RESULT=1
+done <<< "$PR_NUMBERS"
 
 exit $RESULT
