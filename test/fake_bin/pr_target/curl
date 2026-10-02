@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+ROOT_DIR=$(cd -- "$(dirname -- "$0")/../../.." && pwd)
+cat "$ROOT_DIR/test/pr_list_commits.json"

@@ -24,3 +24,6 @@ jobs:
       - name: Run tests
         shell: bash
         run: ./check_email_pr.sh --test
+      - name: Test event handling
+        shell: bash
+        run: bash test/check_event_types.sh
